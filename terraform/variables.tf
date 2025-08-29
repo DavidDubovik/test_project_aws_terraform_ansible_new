@@ -10,12 +10,3 @@ variable "aws_secret_key" {
   sensitive   = true
 }
 
-variable "ami_id" {
-  description = "ID AMI для EC2 інстансу (натисніть Enter для використання значення за замовчуванням)"
-  type        = string
-}
-
-variable "instance_type" {
-  description = "Тип EC2 інстансу (натисніть Enter для використання значення за замовчуванням)"
-  type        = string
-}
