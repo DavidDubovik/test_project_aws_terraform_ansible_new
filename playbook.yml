@@ -1,0 +1,147 @@
+- name: Install and configure WordPress on AWS EC2 # е описовий заголовок, який пояснює, що робить плейбук.
+  hosts: all # Вказує, на яких хостах (серверах) виконуватиметься плейбук. all означає, що плейбук застосовується до усіх хостів, визначених у файлі інвентаризації Ansible (inventory file).
+  remote_user: ubuntu # Вказує ім’я користувача для SSH-підключення до віддаленого сервера. Ansible використовує SSH для зв’язку з EC2-інстансом. remote_user: ubuntu означає, що Ansible підключатиметься до сервера як користувач ubuntu.
+  become: yes # Увімкнення режиму підвищення привілеїв (sudo).
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+  # Блок tasks визначає список задач, які Ansible виконує на віддаленому сервері
+  - name: Update apt cache
+    apt:
+      # Використовує модуль Ansible apt для оновлення кешу пакетів менеджера пакетів apt
+      update_cache: yes # Вказує Ansible виконати оновлення кешу пакетів перед встановленням будь-яких пакетів.
+      cache_valid_time: 3600 # Вказує, як довго (у секундах) кеш вважається дійсним. 3600 секунд = 1 година.
+
+  - name: Install required packages (Apache2, MySQL, PHP)
+    apt:
+      name:
+      # Список пакетів, які потрібно встановити. Кожен пункт відповідає назві пакета в репозиторії Ubuntu.
+      - apache2
+      - mysql-server
+      - python3-mysqldb
+      - php{{ php_version }}
+      - php{{ php_version }}-mysql
+      - libapache2-mod-php{{ php_version }}
+      - php{{ php_version }}-cli
+      - php{{ php_version }}-curl
+      - php{{ php_version }}-mbstring
+      - php{{ php_version }}-xml
+      - php{{ php_version }}-zip
+      - unzip
+      state: present # Вказує, що пакети повинні бути встановлені (present). Якщо вони вже встановлені, Ansible пропустить їх, щоб не виконувати зайвих дій. Інші можливі значення для state: absent (видалити), latest (встановити останню версію).
+
+  - name: Start and enable Apache2
+    service:
+      # Використовує модуль Ansible service для керування службою apache2 на сервері.
+      name: apache2
+      state: started # вказує, що служба apache2 має бути запущена (аналогічно до команди sudo systemctl start apache2).
+      enabled: yes # Вмикає автозапуск служби apache2 під час завантаження системи (аналогічно до sudo systemctl enable apache2).
+
+  - name: Start and enable MySQL
+    service:
+      name: mysql
+      state: started
+      enabled: yes
+
+  - name: Create MySQL database for WordPress
+    mysql_db:
+      name: "{{ wordpress_db_name }}"
+      state: present
+      login_user: root # Вказує користувача MySQL, від імені якого виконується операція.
+      login_password: "{{ mysql_root_password }}"
+    when: mysql_root_password is defined # Умовний оператор, який означає, що задача виконається лише, якщо змінна mysql_root_password визначена.
+    # Виконує SQL-запит, еквівалентний:
+    #   CREATE DATABASE IF NOT EXISTS wordpress;
+
+  - name: Create MySQL user for WordPress
+    mysql_user:
+      name: "{{ wordpress_db_user }}"
+      password: "{{ wordpress_db_password }}"
+      priv: "{{ wordpress_db_name }}.*:ALL" # Вказує права доступу для користувача. Тут {{ wordpress_db_name }}.*:ALL означає, що користувач test_user отримує усі привілеї (ALL) на всі таблиці (*) у базі даних wordpress.
+      host: localhost # Вказує, з якого хоста користувач може підключатися до MySQL. localhost означає, що test_user може підключатися лише з того ж сервера, де працює MySQL (твій EC2-інстанс).
+      state: present
+      login_user: root
+      login_password: "{{ mysql_root_password }}"
+    when: mysql_root_password is defined # Задача виконається лише, якщо mysql_root_password визначений. У твоєму випадку це так (""), тому задача виконається.
+    # Виконує SQL-запити, еквівалентні:
+    #   CREATE USER IF NOT EXISTS 'test_user'@'localhost' IDENTIFIED BY '12345678';
+    #   GRANT ALL PRIVILEGES ON wordpress.* TO 'test_user'@'localhost';
+    #   FLUSH PRIVILEGES;
+
+  - name: Download and extract WordPress
+    unarchive:
+      # Використовує модуль Ansible unarchive для завантаження та розпакування архіву .tar.gz.
+      src: https://wordpress.org/latest.tar.gz # Вказує джерело архіву — URL, звідки завантажується WordPress
+      dest: "{{ wordpress_path }}" # Вказує директорію, куди розпаковується архів. Змінна wordpress_path визначена в твоєму плейбуці як /var/www/html.
+      remote_src: yes # Вказує, що джерело архіву (src) — це віддалений URL, а не локальний файл на машині, де запускається Ansible.
+      extra_opts: [ --strip-components=1 ] # Додає додаткові параметри до команди розпакування (tar). --strip-components=1 видаляє один рівень вкладених директорій під час розпакування.
+      creates: "{{ wordpress_path }}/index.php" # Вказує файл, який сигналізує, що задача вже виконана. Ansible перевіряє, чи існує файл /var/www/html/index.php. Якщо він є, задача пропускається (ідемпотентність), щоб не завантажувати і не розпаковувати архів повторно.
+      owner: www-data # Встановлює власника розпакованих файлів — користувача www-data.
+      group: www-data # Встановлює групу розпакованих файлів — www-data.
+
+  - name: Remove default Apache index.html
+    file:
+      path: "{{ wordpress_path }}/index.html"
+      state: absent
+
+  - name: Copy wp-config.php from sample
+    copy:
+      src: "{{ wordpress_path }}/wp-config-sample.php" # Вказує джерело файлу, який потрібно скопіювати.
+      dest: "{{ wordpress_path }}/wp-config.php" # Вказує, куди скопіювати файл. Результат: створюється /var/www/html/wp-config.php.
+      remote_src: yes # Вказує, що вихідний файл (wp-config-sample.php) розташований на віддаленому сервері (EC2-інстансі), а не на локальній машині, де запускається Ansible.
+      owner: www-data
+      group: www-data
+      mode: "0640" # Встановлює дозволи файлу в форматі UNIX (rw-r-----)
+
+  - name: Configure wp-config.php
+    replace:
+      # Це назва модуля Ansible. Тобто ми кажемо: "Використати модуль replace".
+      path: "{{ wordpress_path }}/wp-config.php" # Файл, у якому будемо робити заміну (тут — wp-config.php).
+      regexp: "{{ item.regexp }}" #  Вказує регулярний вираз для пошуку рядків у файлі, які потрібно замінити.
+      replace: "{{ item.replace }}" # Вказує, на що замінити знайдені рядки. Кожен елемент у циклі loop містить свій текст заміни (item.replace). item беруться із списку loop 
+    loop:
+    # Визначає список замін, які потрібно виконати. Кожен елемент у списку містить: regexp: Регулярний вираз для пошуку рядка. replace: Новий рядок, який замінить знайдений.Ansible виконує заміну для кожного елемента в циклі.
+    - { regexp: "define\\( 'DB_NAME', '[^']*' \\);", replace: "define( 'DB_NAME', '{{ wordpress_db_name }}' );" }
+    - { regexp: "define\\( 'DB_USER', '[^']*' \\);", replace: "define( 'DB_USER', '{{ wordpress_db_user }}' );" }
+    - { regexp: "define\\( 'DB_PASSWORD', '[^']*' \\);", replace: "define( 'DB_PASSWORD', '{{ wordpress_db_password }}' );" }
+    - { regexp: "define\\( 'DB_HOST', '[^']*' \\);", replace: "define( 'DB_HOST', 'localhost' );" }
+    - { regexp: "define\\( 'DB_CHARSET', '[^']*' \\);", replace: "define( 'DB_CHARSET', 'utf8' );" }
+
+  - name: Set permissions for WordPress files
+    file:
+      path: "{{ wordpress_path }}"
+      owner: www-data
+      group: www-data
+      mode: "0755"
+      recurse: yes
+
+  - name: Set permissions for wp-config.php
+    file:
+      path: "{{ wordpress_path }}/wp-config.php"
+      owner: www-data
+      group: www-data
+      mode: "0640"
+
+  - name: Update Apache DirectoryIndex to prioritize index.php
+    lineinfile:
+      # модуль Ansible для редагування файлу: шукає рядок за regex і замінює його на потрібний (line).
+      path: /etc/apache2/mods-enabled/dir.conf
+      regexp: "^DirectoryIndex" # шукає рядок, який починається зі слова DirectoryIndex
+      line: "DirectoryIndex index.php index.html index.cgi index.pl index.xhtml index.htm" # рядок, яким замінити знайдений. Тут задається новий порядок: DirectoryIndex index.php index.html index.cgi index.pl index.xhtml index.htm
+      state: present
+    notify: Restart Apache2 # якщо в файлі відбулась зміна, Ansible викличе хендлер з назвою Restart Apache2 (а той, ймовірно, робить systemctl restart apache2).
+
+  - name: Ensure Apache DocumentRoot is set to /var/www/html
+    lineinfile:
+      path: /etc/apache2/sites-enabled/000-default.conf
+      regexp: "^\\s*DocumentRoot"
+      line: "        DocumentRoot /var/www/html"
+      state: present
+    notify: Restart Apache2
+
+  handlers:
+  - name: Restart Apache2
+    service:
+      name: apache2
+      state: restarted
