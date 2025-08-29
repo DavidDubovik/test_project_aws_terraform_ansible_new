@@ -7,12 +7,12 @@ on:
         description: 'AMI ID для EC2 (наприклад, ami-0c55b159cbfafe1f0)'
         type: string
         required: true
-        default: 'ami-07e075f00c26b085a' # Приклад для Amazon Linux 2
+        default: 'ami-07e075f00c26b085a'
       instance_type:
         description: 'Тип EC2 інстансу'
         type: choice
         options:
-        - t2.micro
+        - t3.micro
         - t3.medium
         - t3.large
         required: true
@@ -21,7 +21,7 @@ on:
         description: 'AWS регіон'
         type: choice
         options:
-        - us-east-1
+        - eu-north-1
         - eu-west-1
         - ap-south-1
         required: true
