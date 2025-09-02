@@ -30,34 +30,19 @@ on:
         description: 'Автоматично виконати terraform apply?'
         type: boolean
         default: false
+
+env:
+  S3_BUCKET: 'your-s3-bucket-name' # Замініть на ім’я вашого S3 бакета
+  TF_STATE_KEY: 'terraform.tfstate' # Шлях до файлу стану в S3
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: .
+        working-directory: terraform # Змінити, якщо ваші Terraform-файли в іншій директорії
 
     steps:
-    - name: Check and Manage EC2 Instance
-      id: check_instance
-      run: |
-          if aws s3 ls s3://${{ env.S3_BUCKET }}/${{ env.TF_STATE_KEY }}; then
-            terraform state pull > terraform.tfstate
-            INSTANCE_ID=$(terraform state show aws_instance.example 2>/dev/null | grep -E "^id" | awk '{print $3}' || echo "")
-            if [ -n "$INSTANCE_ID" ]; then
-              echo "Instance exists with ID: $INSTANCE_ID. Destroying..."
-              terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
-              echo "Recreating instance..."
-              terraform apply -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
-            else
-              echo "Instance does not exist. Creating..."
-              terraform apply -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
-            fi
-          else
-            echo "Terraform state file does not exist in S3. Creating new instance..."
-            terraform apply -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
-          fi
-
     - name: Checkout code
       uses: actions/checkout@v3
 
@@ -71,7 +56,7 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: eu-north-1 # Зміни
+        aws-region: ${{ github.event.inputs.region }}
 
     - name: Terraform Init
       run: terraform init
@@ -79,8 +64,31 @@ jobs:
     - name: Terraform Format
       run: terraform fmt -check
 
+    - name: Check and Manage EC2 Instance
+      id: check_instance
+      run: |
+        if aws s3 ls s3://${{ env.S3_BUCKET }}/${{ env.TF_STATE_KEY }}; then
+          terraform state pull > terraform.tfstate
+          INSTANCE_ID=$(terraform state show aws_instance.example 2>/dev/null | grep -E "^id" | awk '{print $3}' || echo "")
+          if [ -n "$INSTANCE_ID" ]; then
+            echo "Instance exists with ID: $INSTANCE_ID. Destroying..."
+            terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
+            echo "Recreating instance..."
+            terraform apply -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
+          else
+            echo "Instance does not exist. Creating..."
+            terraform apply -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
+          fi
+        else
+          echo "Terraform state file does not exist in S3. Creating new instance..."
+          terraform apply -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
+        fi
+      shell: bash
+
     - name: Terraform Plan
-      if: github.event_name == 'workflow_dispatch'
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.auto_apply == 'false'
       run: terraform plan -out=plan.tfout
 
-
+    - name: Terraform Apply
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.auto_apply == 'true'
+      run: terraform apply -auto-approve
