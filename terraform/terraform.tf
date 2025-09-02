@@ -1,9 +1,3 @@
-provider "aws" {
-  # В access_key і secret_key вказуємо нашого user якого ми створили в aws 
-  access_key = var.aws_access_key
-  secret_key = var.aws_secret_key
-  region     = "eu-north-1" # Це регіон AWS, де створюватимуться ресурси
-}
 
 resource "aws_instance" "my_project" {                 # тут ми створює віртуальну машину (EC2-інстанс) у AWS. Та вказуємо інікальне имя ресурса  
   ami             = "ami-07e075f00c26b085a"            # тут ми вказуємо шаблони операціїних систем та програмного забеспечення
