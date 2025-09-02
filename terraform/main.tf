@@ -1,9 +1,9 @@
 terraform {
   backend "s3" {
-    bucket         = "salodoxerabucket"
-    key            = "terraform.tfstate"
-    region         = "eu-north-1"
-    encrypt        = true
+    bucket  = "salodoxerabucket"
+    key     = "terraform.tfstate"
+    region  = "eu-north-1"
+    encrypt = true
   }
 }
 provider "aws" {
