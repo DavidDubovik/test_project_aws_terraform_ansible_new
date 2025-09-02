@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       ami:
-        description: 'AMI ID для EC2 (наприклад, ami-0c55b159cbfafe1f0)'
+        description: 'AMI ID для EC2'
         type: string
         required: true
         default: 'ami-07e075f00c26b085a'
@@ -26,10 +26,6 @@ on:
         - ap-south-1
         required: true
         default: 'eu-north-1'
-      auto_apply:
-        description: 'Автоматично виконати terraform apply?'
-        type: boolean
-        default: false
 
 jobs:
   terraform:
@@ -41,10 +37,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Debug Directory
-      run: ls -la
-      working-directory: terraform
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
@@ -61,9 +53,6 @@ jobs:
     - name: Terraform Init
       run: terraform init
 
-    - name: Terraform Format
-      run: terraform fmt -check
-
     - name: Check if instance exists
       id: check_instance
       run: |
@@ -73,18 +62,25 @@ jobs:
           echo "instance_exists=false" >> $GITHUB_OUTPUT
         fi
 
-    - name: Terraform Plan
-      if: github.event_name == 'workflow_dispatch' && steps.check_instance.outputs.instance_exists == 'false' && github.event.inputs.auto_apply == 'true'
-      run: terraform plan -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}" -out=plan.tfout
+    - name: Terraform Destroy Existing Instance
+      if: steps.check_instance.outputs.instance_exists == 'true'
+      run: terraform destroy -auto-approve
+      env:
+        TF_VAR_ami: ${{ github.event.inputs.ami }}
+        TF_VAR_instance_type: ${{ github.event.inputs.instance_type }}
+        TF_VAR_region: ${{ github.event.inputs.region }}
 
     - name: Terraform Apply
-      if: github.event_name == 'workflow_dispatch' && steps.check_instance.outputs.instance_exists == 'false' && github.event.inputs.auto_apply == 'true'
-      run: terraform apply -auto-approve plan.tfout
+      run: terraform apply -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
 
-    - name: Clean up plan file
-      if: github.event_name == 'workflow_dispatch' && steps.check_instance.outputs.instance_exists == 'false' && github.event.inputs.auto_apply == 'true'
-      run: rm -f plan.tfout
-      
+    - name: Verify Instance Creation
+      run: |
+        INSTANCE_ID=$(terraform output -raw instance_id)
+        aws ec2 describe-instances --instance-ids $INSTANCE_ID --region ${{ github.event.inputs.region }} --query 'Reservations[].Instances[].State.Name' --output text
+
     - name: Terraform Destroy
-      if: github.event_name == 'workflow_dispatch' && steps.check_instance.outputs.instance_exists == 'true'
-      run: terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
+      run: terraform destroy -auto-approve
+      env:
+        TF_VAR_ami: ${{ github.event.inputs.ami }}
+        TF_VAR_instance_type: ${{ github.event.inputs.instance_type }}
+        TF_VAR_region: ${{ github.event.inputs.region }}
