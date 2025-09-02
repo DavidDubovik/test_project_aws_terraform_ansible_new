@@ -1,0 +1,90 @@
+name: Terraform CI/CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      ami:
+        description: 'AMI ID для EC2'
+        type: string
+        required: true
+        default: 'ami-07e075f00c26b085a'
+      instance_type:
+        description: 'Тип EC2 інстансу'
+        type: choice
+        options: [t3.micro, t3.medium, t3.large]
+        required: true
+        default: 't3.micro'
+      region:
+        description: 'AWS регіон'
+        type: choice
+        options: [eu-north-1, eu-west-1, ap-south-1]
+        required: true
+        default: 'eu-north-1'
+      auto_apply:
+        description: 'Автоматично виконати terraform apply?'
+        type: boolean
+        default: false
+      destroy:
+        description: 'Знищити ресурси?'
+        type: boolean
+        default: false
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ github.event.inputs.region }}
+      S3_BUCKET: salodoxerabucket
+      TF_STATE_KEY: terraform.tfstate
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+    - name: Check EC2 Instance
+        run: |
+          if aws s3 ls s3://${{ env.S3_BUCKET }}/${{ env.TF_STATE_KEY }}; then
+            terraform state pull > terraform.tfstate
+            INSTANCE_ID=$(terraform state show aws_instance.example 2>/dev/null | grep -E "^id" | awk '{print $3}' || echo "")
+            if [ -n "$INSTANCE_ID" ] && aws ec2 describe-instances --instance-ids $INSTANCE_ID --region ${{ env.AWS_REGION }} --query 'Reservations[].Instances[].State.Name' --output text 2>/dev/null; then
+              echo "Instance exists with ID: $INSTANCE_ID"
+            else
+              echo "Instance does not exist"
+            fi
+          else
+            echo "Terraform state file does not exist in S3"
+          fi
+
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Install AWS CLI
+      run: sudo apt-get update && sudo apt-get install -y awscli
+
+    - name: Terraform Init
+      run: terraform init -backend-config="bucket=${{ env.S3_BUCKET }}" -backend-config="key=${{ env.TF_STATE_KEY }}" -backend-config="region=${{ env.AWS_REGION }}"
+
+
+    - name: Terraform Plan
+      if: github.event.inputs.destroy != 'true'
+      run: terraform plan -out=plan.tfout
+
+    - name: Terraform Apply
+      if: github.event.inputs.auto_apply == 'true' && github.event.inputs.destroy != 'true'
+      run: terraform apply -auto-approve
+
+    - name: Terraform Destroy
+      if: github.event.inputs.destroy == 'true'
+      run: terraform destroy -auto-approve
