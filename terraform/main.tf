@@ -3,7 +3,6 @@ terraform {
     bucket         = "salodoxerabucket"
     key            = "terraform.tfstate"
     region         = "eu-north-1"
-    use_lockfile   = true
     encrypt        = true
   }
 }
