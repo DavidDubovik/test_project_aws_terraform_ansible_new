@@ -38,22 +38,22 @@ jobs:
       TF_STATE_KEY: terraform.tfstate
     defaults:
       run:
-        working-directory: terraform
+        working-directory: .
 
     steps:
     - name: Check EC2 Instance
-      run: |
-        if aws s3 ls s3://${{ env.S3_BUCKET }}/${{ env.TF_STATE_KEY }}; then
-          terraform state pull > terraform.tfstate
-          INSTANCE_ID=$(terraform state show aws_instance.example 2>/dev/null | grep -E "^id" | awk '{print $3}' || echo "")
-          if [ -n "$INSTANCE_ID" ] && aws ec2 describe-instances --instance-ids $INSTANCE_ID --region ${{ env.AWS_REGION }} --query 'Reservations[].Instances[].State.Name' --output text 2>/dev/null; then
-            echo "Instance exists"
+        run: |
+          if aws s3 ls s3://${{ env.S3_BUCKET }}/${{ env.TF_STATE_KEY }}; then
+            terraform state pull > terraform.tfstate
+            INSTANCE_ID=$(terraform state show aws_instance.example 2>/dev/null | grep -E "^id" | awk '{print $3}' || echo "")
+            if [ -n "$INSTANCE_ID" ] && aws ec2 describe-instances --instance-ids $INSTANCE_ID --region ${{ env.AWS_REGION }} --query 'Reservations[].Instances[].State.Name' --output text 2>/dev/null; then
+              echo "Instance exists with ID: $INSTANCE_ID"
+            else
+              echo "Instance does not exist"
+            fi
           else
-            echo "Instance does not exist"
+            echo "Terraform state file does not exist in S3"
           fi
-        else
-          echo "Instance does not exist"
-        fi
 
     - name: Checkout code
       uses: actions/checkout@v3
