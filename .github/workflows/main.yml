@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: terraform
+        working-directory: .
 
     steps:
     - name: Check and Manage EC2 Instance
@@ -57,10 +57,6 @@ jobs:
             echo "Terraform state file does not exist in S3. Creating new instance..."
             terraform apply -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
           fi
-
-    - name: Terraform Destroy (optional)
-      if: github.event_name == 'workflow_dispatch' || github.event.inputs.destroy == 'true'
-      run: terraform destroy -auto-approve
 
     - name: Checkout code
       uses: actions/checkout@v3
@@ -87,8 +83,4 @@ jobs:
       if: github.event_name == 'workflow_dispatch'
       run: terraform plan -out=plan.tfout
 
-    - name: Terraform Apply
-      if: github.event_name == 'workflow_dispatch'
-      run: terraform apply -auto-approve
 
-    
