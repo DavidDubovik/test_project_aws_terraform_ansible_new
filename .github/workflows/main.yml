@@ -4,117 +4,91 @@ on:
   workflow_dispatch:
     inputs:
       ami:
-        description: 'AMI ID для EC2'
+        description: 'AMI ID для EC2 (наприклад, ami-0c55b159cbfafe1f0)'
         type: string
         required: true
         default: 'ami-07e075f00c26b085a'
       instance_type:
         description: 'Тип EC2 інстансу'
         type: choice
-        options: [t3.micro, t3.medium, t3.large]
+        options:
+        - t3.micro
+        - t3.medium
+        - t3.large
         required: true
         default: 't3.micro'
       region:
         description: 'AWS регіон'
         type: choice
-        options: [eu-north-1, eu-west-1, ap-south-1]
+        options:
+        - eu-north-1
+        - eu-west-1
+        - ap-south-1
         required: true
         default: 'eu-north-1'
       auto_apply:
         description: 'Автоматично виконати terraform apply?'
         type: boolean
         default: false
-      destroy:
-        description: 'Знищити ресурси?'
-        type: boolean
-        default: false
-
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    env:
-      AWS_REGION: ${{ github.event.inputs.region }}
-      S3_BUCKET: salodoxerabucket
-      TF_STATE_KEY: terraform.tfstate
     defaults:
       run:
-        working-directory: .  # Файли Terraform у корені репозиторію
+        working-directory: terraform
 
     steps:
-      # Крок 1: Клонування репозиторію
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # Крок 2: Встановлення AWS CLI
-      - name: Install AWS CLI
-        run: sudo apt-get update && sudo apt-get install -y awscli
-
-      # Крок 3: Налаштування AWS Credentials
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      # Крок 4: Встановлення Terraform
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.9.5
-
-      # Крок 5: Ініціалізація Terraform
-      - name: Terraform Init
-        run: terraform init -backend-config="bucket=${{ env.S3_BUCKET }}" -backend-config="key=${{ env.TF_STATE_KEY }}" -backend-config="region=${{ env.AWS_REGION }}"
-
-      # Крок 6: Перевірка наявності tfstate та стану інстансу
-      - name: Check EC2 Instance
-        id: check_instance
-        run: |
+    - name: Check and Manage EC2 Instance
+      id: check_instance
+      run: |
           if aws s3 ls s3://${{ env.S3_BUCKET }}/${{ env.TF_STATE_KEY }}; then
             terraform state pull > terraform.tfstate
             INSTANCE_ID=$(terraform state show aws_instance.example 2>/dev/null | grep -E "^id" | awk '{print $3}' || echo "")
             if [ -n "$INSTANCE_ID" ]; then
-              STATE=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --region ${{ env.AWS_REGION }} --query 'Reservations[].Instances[].State.Name' --output text 2>/dev/null || echo "unknown")
-              echo "Instance exists with ID: $INSTANCE_ID, State: $STATE"
-              echo "instance_exists=true" >> $GITHUB_OUTPUT
+              echo "Instance exists with ID: $INSTANCE_ID. Destroying..."
+              terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
+              echo "Recreating instance..."
+              terraform apply -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
             else
-              echo "Instance does not exist in Terraform state"
-              echo "instance_exists=false" >> $GITHUB_OUTPUT
+              echo "Instance does not exist. Creating..."
+              terraform apply -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
             fi
           else
-            echo "Terraform state file does not exist in S3"
-            echo "instance_exists=false" >> $GITHUB_OUTPUT
+            echo "Terraform state file does not exist in S3. Creating new instance..."
+            terraform apply -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
           fi
 
-      # Крок 7: Видалення інстансу, якщо він існує
-      - name: Terraform Destroy if Instance Exists
-        if: steps.check_instance.outputs.instance_exists == 'true' && github.event.inputs.destroy != 'true'
-        run: terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
+    - name: Terraform Destroy (optional)
+      if: github.event_name == 'workflow_dispatch' || github.event.inputs.destroy == 'true'
+      run: terraform destroy -auto-approve
 
-      # Крок 8: Створення інстансу, якщо він не існує
-      - name: Terraform Plan and Apply if Instance Does Not Exist
-        if: steps.check_instance.outputs.instance_exists == 'false' && github.event.inputs.destroy != 'true'
-        run: |
-          terraform plan -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -out=plan.tfout
-          terraform apply -auto-approve plan.tfout
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      # Крок 9: Terraform Plan (якщо не destroy і не автоматичне створення/видалення)
-      - name: Terraform Plan
-        if: github.event.inputs.destroy != 'true' && steps.check_instance.outputs.instance_exists == 'true' && github.event.inputs.auto_apply != 'true'
-        run: terraform plan -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -out=plan.tfout
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
 
-      # Крок 10: Terraform Apply (якщо auto_apply увімкнено)
-      - name: Terraform Apply
-        if: github.event.inputs.auto_apply == 'true' && github.event.inputs.destroy != 'true' && steps.check_instance.outputs.instance_exists == 'true'
-        run: terraform apply -auto-approve plan.tfout
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: eu-north-1 # Зміни
 
-      # Крок 11: Terraform Destroy (якщо destroy увімкнено)
-      - name: Terraform Destroy
-        if: github.event.inputs.destroy == 'true'
-        run: terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}"
+    - name: Terraform Init
+      run: terraform init
 
-      # Крок 12: Виведення деталей інстансу
-      - name: Output Instance Details
-        if: github.event.inputs.auto_apply == 'true' && github.event.inputs.destroy != 'true'
-        run: terraform output
+    - name: Terraform Format
+      run: terraform fmt -check
+
+    - name: Terraform Plan
+      if: github.event_name == 'workflow_dispatch'
+      run: terraform plan -out=plan.tfout
+
+    - name: Terraform Apply
+      if: github.event_name == 'workflow_dispatch'
+      run: terraform apply -auto-approve
+
+    
