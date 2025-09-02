@@ -32,7 +32,7 @@ on:
         default: false
 
 env:
-  S3_BUCKET: 'your-s3-bucket-name' # Замініть на ім’я вашого S3 бакета
+  S3_BUCKET: 'your-actual-s3-bucket-name' # Замініть на реальне ім’я вашого S3 бакета
   TF_STATE_KEY: 'terraform.tfstate' # Шлях до файлу стану в S3
 
 jobs:
@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: terraform # Змінити, якщо ваші Terraform-файли в іншій директорії
+        working-directory: terraform # Змінити, якщо Terraform-файли в іншій директорії
 
     steps:
     - name: Checkout code
@@ -57,6 +57,7 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ github.event.inputs.region }}
+        # Видалено audience, оскільки використовуються статичні credentials
 
     - name: Terraform Init
       run: terraform init
