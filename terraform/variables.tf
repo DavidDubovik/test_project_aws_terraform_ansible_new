@@ -23,4 +23,4 @@ variable "instance_type" {
 variable "region" {
   description = "AWS регіон"
   type        = string
-}
+} 

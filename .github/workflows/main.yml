@@ -69,6 +69,7 @@ jobs:
       run: |
         if terraform state show aws_instance.example >/dev/null 2>&1; then
           echo "instance_exists=true" >> $GITHUB_OUTPUT
+          terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
         else
           echo "instance_exists=false" >> $GITHUB_OUTPUT
         fi
