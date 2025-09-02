@@ -75,11 +75,11 @@ jobs:
     #     fi
 
     - name: Terraform Plan
-      if: github.event_name == 'workflow_dispatch' && steps.check_instance.outputs.instance_exists == 'false' && github.event.inputs.auto_apply == 'true'
+      if: steps.check_instance.outputs.instance_exists == 'false' && github.event.inputs.auto_apply == 'true'
       run: terraform plan -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}" -out=plan.tfout
 
     - name: Terraform Apply
-      if: github.event_name == 'workflow_dispatch' && steps.check_instance.outputs.instance_exists == 'false' && github.event.inputs.auto_apply == 'true'
+      if: steps.check_instance.outputs.instance_exists == 'false' && github.event.inputs.auto_apply == 'true'
       run: terraform apply -auto-approve plan.tfout
 
     - name: Terraform Destroy
