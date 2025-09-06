@@ -26,13 +26,6 @@ on:
         - ap-south-1
         required: true
         default: 'eu-north-1'
-      auto_apply:
-        description: 'Автоматично виконати terraform apply?'
-        type: boolean
-        default: true
-concurrency:
-  group: terraform-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   terraform:
@@ -45,7 +38,7 @@ jobs:
 
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Debug Workflow Start
       run: echo "Starting workflow at $(date) with run ID ${{ github.run_id }} and attempt ${{ github.run_attempt }}"
     # - name: Setup Terraform
