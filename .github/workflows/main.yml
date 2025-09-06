@@ -51,14 +51,13 @@ jobs:
     - name: Terraform Init with S3 Backend
       run: terraform init -backend-config="bucket=salodoxerabucket" -backend-config="key=terraform.tfstate" -backend-config="region=${{ github.event.inputs.region }}"
       # Замініть "my-terraform-state-bucket" на назву вашого S3 bucket
-
     - name: Check if instance exists and get data from S3
       id: check_instance
       run: |
-        if terraform state show aws_instance.example; then
+        if terraform state show aws_instance.my_project; then
           # Витягти дані з стану з S3
-          AMI=$(terraform state show aws_instance.example | grep 'ami' | awk '{print $3}' | tr -d '"')
-          INSTANCE_TYPE=$(terraform state show aws_instance.example | grep 'instance_type' | awk '{print $3}' | tr -d '"')
+          AMI=$(terraform state show aws_instance.my_project | grep 'ami' | awk '{print $3}' | tr -d '"')
+          INSTANCE_TYPE=$(terraform state show aws_instance.my_project | grep 'instance_type' | awk '{print $3}' | tr -d '"')
           
           # Використати регіон із вхідних даних або S3, якщо доступно
           REGION=${{ github.event.inputs.region }}
