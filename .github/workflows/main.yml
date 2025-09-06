@@ -42,11 +42,12 @@ jobs:
         working-directory: terraform
 
     steps:
-    - name: Debug Workflow Start
-      run: echo "Starting workflow at $(date) with run ID ${{ github.run_id }} and attempt ${{ github.run_attempt }}"
 
     - name: Checkout code
       uses: actions/checkout@v4
+      
+    - name: Debug Workflow Start
+      run: echo "Starting workflow at $(date) with run ID ${{ github.run_id }} and attempt ${{ github.run_attempt }}"
     # - name: Setup Terraform
     #   uses: hashicorp/setup-terraform@v3
     #   with:
