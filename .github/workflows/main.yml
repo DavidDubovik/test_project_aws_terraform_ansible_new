@@ -41,43 +41,44 @@ jobs:
 
     - name: Debug Workflow Start
       run: echo "Starting workflow at $(date) with run ID ${{ github.run_id }} and attempt ${{ github.run_attempt }}"
-    # - name: Setup Terraform
-    #   uses: hashicorp/setup-terraform@v3
-    #   with:
-    #     terraform_version: 1.5.0
 
-    # - name: Configure AWS Credentials
-    #   uses: aws-actions/configure-aws-credentials@v4
-    #   with:
-    #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-    #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    #     aws-region: ${{ github.event.inputs.region }}
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
 
-    # - name: Terraform Init
-    #   run: terraform init
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ github.event.inputs.region }}
 
-    # - name: Terraform Format
-    #   run: terraform fmt -check
+    - name: Terraform Init
+      run: terraform init
 
-    # - name: Check if instance exists
-    #   id: check_instance
-    #   run: |
-    #     if terraform state show aws_instance.example >/dev/null 2>&1; then
-    #       echo "instance_exists=true" >> $GITHUB_OUTPUT
-    #       terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
-    #     else
-    #       echo "instance_exists=false" >> $GITHUB_OUTPUT
-    #     fi
+    - name: Terraform Format
+      run: terraform fmt -check
 
-    # - name: Terraform Plan
-    #   if: steps.check_instance.outputs.instance_exists == 'false' && github.event.inputs.auto_apply == 'true'
-    #   run: terraform plan -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}" -out=plan.tfout
+    - name: Check if instance exists
+      id: check_instance
+      run: |
+        if terraform state show aws_instance.example >/dev/null 2>&1; then
+          echo "instance_exists=true" >> $GITHUB_OUTPUT
+          terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
+        else
+          echo "instance_exists=false" >> $GITHUB_OUTPUT
+        fi
 
-    # - name: Terraform Apply
-    #   if: steps.check_instance.outputs.instance_exists == 'false' && github.event.inputs.auto_apply == 'true'
-    #   run: terraform apply -auto-approve plan.tfout
+    - name: Terraform Plan
+      if: steps.check_instance.outputs.instance_exists == 'false'
+      run: terraform plan -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}" -out=plan.tfout
 
-    # - name: Terraform Destroy
-    #   if: github.event_name == 'workflow_dispatch'
-    #   run: terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
+    - name: Terraform Apply
+      if: steps.check_instance.outputs.instance_exists == 'false' 
+      run: terraform apply -auto-approve plan.tfout
+
+    - name: Terraform Destroy
+      if: github.event_name == 'workflow_dispatch'
+      run: terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
 
