@@ -36,11 +36,11 @@ jobs:
         working-directory: terraform
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
     - name: Debug Workflow Start
       run: echo "Workflow run ID: ${{ github.run_id }} started at $(date)"
+
+    - name: Checkout code
+      uses: actions/checkout@v4
 
     # - name: Setup Terraform
     #   uses: hashicorp/setup-terraform@v3
