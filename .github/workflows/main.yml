@@ -54,7 +54,7 @@ jobs:
     - name: Check if instance exists and get data from S3
       id: check_instance
       run: |
-        if terraform state show aws_instance.my_project; then
+        if terraform state show aws_instance.my_project == 0 ; then
           # Витягти дані з стану з S3
           AMI=$(terraform state show aws_instance.my_project | grep 'ami' | awk '{print $3}' | tr -d '"')
           INSTANCE_TYPE=$(terraform state show aws_instance.my_project | grep 'instance_type' | awk '{print $3}' | tr -d '"')
@@ -79,17 +79,17 @@ jobs:
 
     - name: Terraform Plan
       id: plan
-      if: steps.plan.outcome == 'success'
+      if: steps.check_instance.outcome == 'success'
       # if: steps.check_instance.outputs.instance_exists == 'false'
       run: terraform plan -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}" -out=plan.tfout
 
     - name: Terraform Apply
       id: apply
       # if: steps.check_instance.outputs.instance_exists == 'false'
-      if: steps.check_instance.outcome == 'success'
+      if: steps.plan.outcome == 'success'
       run: terraform apply -auto-approve plan.tfout
 
     - name: Terraform Destroy
-      if: steps.plan.outcome == 'success'
+      if: steps.apply.outcome == 'success'
       # if: github.event_name == 'workflow_dispatch'
       run: terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
