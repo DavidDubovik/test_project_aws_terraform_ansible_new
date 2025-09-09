@@ -74,10 +74,11 @@ jobs:
           # Видалити інстанс із витягнутими даними
           terraform destroy -auto-approve -var="ami=$AMI" -var="instance_type=$INSTANCE_TYPE" -var="region=$REGION"
         else
+          TR=$(terraform state show aws_instance.my_project
           echo "$AMI"
           echo "$INSTANCE_TYPE"
           echo "$REGION"
-          echo terraform state show aws_instance.my_project
+          echo "$TR"
           echo "Інстанса не створений" 
         fi
 
