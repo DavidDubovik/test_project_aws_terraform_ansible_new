@@ -54,7 +54,7 @@ jobs:
     - name: Check if instance exists and get data from S3
       id: check_instance
       run: |
-        if terraform state show aws_instance.my_project == 0 ; then
+        if terraform state show aws_instance.my_project > /dev/null 2>&1; then
           # Витягти дані з стану з S3
           AMI=$(terraform state show aws_instance.my_project | grep 'ami' | awk '{print $3}' | tr -d '"')
           INSTANCE_TYPE=$(terraform state show aws_instance.my_project | grep 'instance_type' | awk '{print $3}' | tr -d '"')
@@ -74,11 +74,6 @@ jobs:
           # Видалити інстанс із витягнутими даними
           terraform destroy -auto-approve -var="ami=$AMI" -var="instance_type=$INSTANCE_TYPE" -var="region=$REGION"
         else
-          TR=$(terraform state show aws_instance.my_project)
-          echo "$AMI"
-          echo "$INSTANCE_TYPE"
-          echo "$REGION"
-          echo "$TR"
           echo "Інстанса не створений" 
         fi
 
