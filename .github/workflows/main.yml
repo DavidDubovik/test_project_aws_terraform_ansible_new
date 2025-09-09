@@ -53,6 +53,7 @@ jobs:
       # Замініть "my-terraform-state-bucket" на назву вашого S3 bucket
     - name: Check if instance exists and get data from S3
       id: check_instance
+      continue-on-error: true
       run: |
         if terraform state show aws_instance.my_project == 0 ; then
           # Витягти дані з стану з S3
