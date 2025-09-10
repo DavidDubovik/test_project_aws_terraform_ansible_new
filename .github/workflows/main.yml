@@ -56,20 +56,13 @@ jobs:
       run: |
         if terraform state show aws_instance.my_project > /dev/null 2>&1; then
           # Витягти дані з стану з S3
-          AMI=$(terraform state show aws_instance.my_project | grep 'ami' | awk '{print $3}' | tr -d '"')
-          INSTANCE_TYPE=$(terraform state show aws_instance.my_project | grep 'instance_type' | awk '{print $3}' | tr -d '"')
-          
-          # Використати регіон із вхідних даних або S3, якщо доступно
-          REGION=${{ github.event.inputs.region }}
+          echo "AMI=$(terraform state show aws_instance.my_project | grep 'ami' | awk '{print $3}' | tr -d '"')" >> $GITHUB_ENV
+          echo "INSTANCE_TYPE=$(terraform state show aws_instance.my_project | grep 'instance_type' | awk '{print $3}' | tr -d '"')" >> $GITHUB_ENV
+          echo "REGION=$(terraform state show aws_instance.my_project | grep 'region' | awk '{print $3}' | tr -d '"')" >> $GITHUB_ENV
           
           echo "Extracted AMI: $AMI"
           echo "Extracted INSTANCE_TYPE: $INSTANCE_TYPE"
           echo "Extracted REGION: $REGION"
-          
-          echo "instance_exists=true" >> $GITHUB_OUTPUT
-          echo "extracted_ami=$AMI" >> $GITHUB_OUTPUT
-          echo "extracted_instance_type=$INSTANCE_TYPE" >> $GITHUB_OUTPUT
-          echo "extracted_region=$REGION" >> $GITHUB_OUTPUT
           
           # Видалити інстанс із витягнутими даними
           terraform destroy -auto-approve -var="ami=$AMI" -var="instance_type=$INSTANCE_TYPE" -var="region=$REGION"
