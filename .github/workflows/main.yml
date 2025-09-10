@@ -58,7 +58,7 @@ jobs:
           # Витягти дані з стану з S3
           AMI=$(terraform state show aws_instance.my_project | grep 'ami' | awk '{print $3}' | tr -d '"')
           INSTANCE_TYPE=$(terraform state show aws_instance.my_project | grep 'instance_type' | awk '{print $3}' | tr -d '"')
-          REGION=${{ github.event.inputs.region }}
+          REGION=$(terraform state show aws_instance.my_project | grep 'region' | awk '{print $3}' | tr -d '"')
           
           echo "AMI=$AMI" >> $GITHUB_ENV
           echo "INSTANCE_TYPE=$INSTANCE_TYPE" >> $GITHUB_ENV
