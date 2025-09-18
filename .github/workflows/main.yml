@@ -90,6 +90,6 @@ jobs:
       if: steps.plan.outcome == 'success'
       run: terraform apply -auto-approve plan.tfout
 
-    - name: Terraform Destroy
-      if: steps.apply.outcome == 'success'
-      run: terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
+    # - name: Terraform Destroy
+    #   if: steps.apply.outcome == 'success'
+    #   run: terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
