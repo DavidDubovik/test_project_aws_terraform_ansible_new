@@ -26,7 +26,12 @@ on:
         - ap-south-1
         required: true
         default: 'eu-north-1'
-
+      destroy_instance:
+        description: 'Видалити EC2 інстанс після виконання?'
+        type: boolean
+        required: true
+        default: false
+        
 jobs:
   terraform:
     runs-on: ubuntu-latest
@@ -51,6 +56,7 @@ jobs:
     - name: Terraform Init with S3 Backend
       run: terraform init -backend-config="bucket=salodoxerabucket" -backend-config="key=terraform.tfstate" -backend-config="region=${{ github.event.inputs.region }}"
       # Замініть "my-terraform-state-bucket" на назву вашого S3 bucket
+      
     - name: Check if instance exists and get data from S3
       id: check_instance
       run: |

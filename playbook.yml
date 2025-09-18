@@ -47,7 +47,7 @@
   - name: Create MySQL database for WordPress
     mysql_db:
       name: "{{ wordpress_db_name }}"
-      state: present
+      state: present # Гарантує, що база даних створена.
       login_user: root # Вказує користувача MySQL, від імені якого виконується операція.
       login_password: "{{ mysql_root_password }}"
     when: mysql_root_password is defined # Умовний оператор, який означає, що задача виконається лише, якщо змінна mysql_root_password визначена.
