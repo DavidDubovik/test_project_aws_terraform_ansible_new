@@ -82,12 +82,12 @@ jobs:
 
     - name: Terraform Plan
       id: plan
-      if: steps.check_instance.outcome == 'success'
+      # if: steps.check_instance.outcome == 'success'
       run: terraform plan -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}" -out=plan.tfout
 
     - name: Terraform Apply
       id: apply
-      if: steps.plan.outcome == 'success'
+      # if: steps.plan.outcome == 'success'
       run: terraform apply -auto-approve plan.tfout
 
     # - name: Terraform Destroy
