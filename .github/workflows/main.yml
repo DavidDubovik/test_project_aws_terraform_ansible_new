@@ -31,7 +31,7 @@ on:
         type: boolean
         required: true
         default: false
-        
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
@@ -60,7 +60,7 @@ jobs:
     - name: Check if instance exists and get data from S3
       id: check_instance
       run: |
-        if terraform state show aws_instance.my_project > /dev/null 2>&1; then
+        if github.event.inputs.destroy_instance == 'true' > /dev/null 2>&1; then
           # Витягти дані з стану з S3
           AMI=$(terraform state show aws_instance.my_project | grep 'ami' | awk '{print $3}' | tr -d '"')
           INSTANCE_TYPE=$(terraform state show aws_instance.my_project | grep 'instance_type' | awk '{print $3}' | tr -d '"')
@@ -90,6 +90,6 @@ jobs:
       if: steps.plan.outcome == 'success'
       run: terraform apply -auto-approve plan.tfout
 
-    - name: Terraform Destroy
-      if: steps.apply.outcome == 'success'
-      run: terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
+    # - name: Terraform Destroy
+    #   if: steps.apply.outcome == 'success'
+    #   run: terraform destroy -auto-approve -var="ami=${{ github.event.inputs.ami }}" -var="instance_type=${{ github.event.inputs.instance_type }}" -var="region=${{ github.event.inputs.region }}"
